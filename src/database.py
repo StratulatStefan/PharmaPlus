@@ -2,8 +2,8 @@ import random as rand
 import TablesFormat as tformat
 from database_operations import *
 
-username = input("Username : ")
-password = input("Password : ")
+username = "pharma"
+password = "8246"
 
 class DataBaseConnection:
     def __init__(self):
@@ -13,11 +13,13 @@ class DataBaseConnection:
         self.connection = None
 
     def authentification(self,user,passw):
-        if user.lower() == username:
+        username = "pharma"
+        password = "8246"
+        if user.lower() == username.lower():
             self.username = user
         else:
             return False, "Username gresit!\n"
-        if passw.lower() == password:
+        if passw.lower() == password.lower():
             self.password = passw
         else:
             return False, "Parola gresita!\n"

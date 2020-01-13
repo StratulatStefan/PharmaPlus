@@ -19,25 +19,25 @@ class DataBaseOperations:
     @staticmethod
     def AddConstraintPrimaryKey(cursor,table,attribute):
         command = 'ALTER TABLE ' + table + '\
-               ADD CONSTRAINT ' + table +  '_PK PRIMARY KEY (' + attribute + ')'
+               ADD CONSTRAINT ' + table[:5] + '_' + attribute[:5] +  '_PK PRIMARY KEY (' + attribute + ')'
         try:
             cursor.execute(command)
         except Oracle.DatabaseError:
-            return "Constraint " + table + "_" + attribute + "_PK " + " already created!"
+            return "Constraint " + table[:5] + '_' + attribute[:5] + "_PK " + " already created!"
         else:
-            return "Constraint " + table + "_" + attribute + "_PK " + " successfully created!"
+            return "Constraint " + table[:5] + '_' + attribute[:5] + "_PK " + " successfully created!"
 
     @staticmethod
     def AddConstraintForeignKey(cursor,table,foreigntable,attribute,foreignattribute):
         command = 'ALTER TABLE ' + table + '\
-                   ADD CONSTRAINT ' + table + '_FK FOREIGN KEY (' + attribute + ' ) '+ \
+                   ADD CONSTRAINT ' + table[:5] + '_' + attribute[:5] + '_FK FOREIGN KEY (' + attribute + ' ) '+ \
                   'REFERENCES ' + foreigntable + ' (' + foreignattribute + ')'
         try:
             cursor.execute(command)
         except Oracle.DatabaseError:
-            return "Constraint " + table + "_" + attribute + "_FK " + " already created!"
+            return "Constraint " + table[:5] + '_' + attribute[:5] + "_FK " + " already created!"
         else:
-            return "Constraint " + table + "_" + attribute + "_FK " + " successfully created!"
+            return "Constraint " + table[:5] + '_' + attribute[:5] + "_FK " + " successfully created!"
 
     @staticmethod
     def AddConstraintUniqueKey(cursor,table,column_names):
@@ -59,6 +59,7 @@ class DataBaseOperations:
     def InsertCommand(connection,command):
         try:
             connection.cursor().execute(command)
+            connection.commit()
         except Oracle.DatabaseError:
             return False, "Tuple {} already inserted!".format(command)
         else:

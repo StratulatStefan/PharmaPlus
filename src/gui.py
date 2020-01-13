@@ -35,7 +35,7 @@ class GUI(tk.Tk):
     def show_frame(self, cont):
         frame = self.frames[cont]
         if cont.find("DTL_") == 0 or cont.find("Contabilitate") == 0:
-            frame.Show()
+            frame.Show(cont)
         frame.tkraise()
 
 
@@ -146,12 +146,17 @@ class DisplayTableLayout(tk.Frame):
         self.closeButton = tk.Button(self, text="Mergi inapoi", width=15, command=lambda: controller.show_frame('DisplayTables'))
         self.closeButton.pack(pady = 10,padx = 40)
         self.cols = ['INDEX']
+        self.drug_id_label = None
         self.tempList = None
         self.listBox = None
+        self.druglabel = None
+        self.drug_id_label = None
+        self.drug_search = None
+        self.drugbutton = None
 
 
-
-    def Show(self,):
+    def Show(self,cont):
+        print(cont)
         if self.listBox != None:
             self.listBox.destroy()
             self.tempList = DataBaseOperations.GetAllFromTable(database.cursor_,self.tablename)
@@ -167,11 +172,49 @@ class DisplayTableLayout(tk.Frame):
             self.listBox.insert("", "end", values=values)
 
         for col in self.cols:
-            self.listBox.heading(col, text=col)
+            self.listBox.heading(col, text = col)
         self.listBox.pack(pady = 40,padx = 10)
+        fields = ['STOCURI','VANZARI','DEPOZITE','MEDICAMENTE']
+        conditions = []
+        condition = False
+        for field in fields:
+            conditions.append(cont.find(field) > 0)
+        for cnd in conditions:
+            if cnd:
+                condition = True
+                break
+        if condition:
+            if self.druglabel != None:
+                self.druglabel.destroy()
+            if self.drug_id_label != None:
+                self.drug_id_label.destroy()
+            if self.drug_search != None:
+                self.drug_search.destroy()
+            if self.drugbutton != None:
+                self.drugbutton.destroy()
+            self.druglabel = tk.Label(self,text = 'Medicamentul cautat',font=("Verdana", 15),background="bisque")
+            self.druglabel.pack(padx=10,pady=10)
+            self.drug_search = tk.Entry(self,width=20,text='-')
+            self.drug_search.pack(pady = 10,padx = 10)
+            self.drug_id_label = tk.Label(self,text = "" ,font=("Verdana", 15),background="bisque")
+            self.drugbutton = tk.Button(self,text = 'Obtine ID',width=15,command = lambda : self.GetDrugId(self.drug_search))
+            self.drugbutton.pack(pady = 10,padx = 10)
         self.closeButton.pack_forget()
         self.closeButton.pack(pady = 10,padx = 40)
 
+
+    def GetDrugId(self,field):
+        drugName = field.get()
+        id = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,'MEDICAMENTE',{'ID_MEDICAMENT'},'NUME = \'{}\''.format(drugName.lower().capitalize()))
+        self.drug_id_label.pack_forget()
+        self.closeButton.pack_forget()
+
+        if not id:
+            self.drug_id_label["text"] = "Nu exista medicamentul cautat"
+        else:
+            self.drug_id_label["text"] = "ID : {}".format(id[0][0])
+        self.drug_id_label.pack(pady = 10,padx = 10)
+        self.closeButton.pack(pady = 10,padx = 40)
 
 
 class Transaction(tk.Frame):
@@ -208,8 +251,8 @@ class Transaction(tk.Frame):
     def CreateComboboxes(self):
         tk.Label(self,text = "Alegeti farmacia",font=("Verdana",15),background="bisque").pack(pady = 15,padx = 0)
         self.farmacie['mapa'] = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,"FARMACII",["ID_FARMACIE"],0)
-        self.farmacie['mapa'] = [["FARMACIA--",element] for element in self.farmacie['mapa']]
-        self.farmacie['combobox'] = ttk.Combobox(self,values=self.farmacie['mapa'],state='readonly')
+        self.farmacie['mapa'] = ["FARMACIA " + str(element) for element in range(1,4)]
+        self.farmacie['combobox'] = ttk.Combobox(self,values = self.farmacie['mapa'],state='readonly')
         self.farmacie['combobox'].bind('<<ComboboxSelected>>',self.Farma_Selected)
         self.farmacie['combobox'].pack(pady=5,padx=0)
         self.farmacie['combobox'].current(0)
@@ -252,27 +295,33 @@ class Transaction(tk.Frame):
 
 
     def Farma_Selected(self,event):
-        self.farmacie['selectie_id'] = self.farmacie['combobox'].get()[len("FARMACIA-- "):]
+        text = self.farmacie['combobox'].get()
+        self.farmacie['selectie_id'] = str(2000 + int(text[text.find(" ")+1:]) - 1)
         self.angajat['mapa'] = DataBaseOperations.ExtractEmployeesfromPharma(database.cursor_,str(self.farmacie['selectie_id']))
-        self.angajat['combobox']['values'] = ["" + angajat[0] + " -- " + angajat[1] + " -- " + str(angajat[2]) for angajat in self.angajat['mapa']]
+        self.angajat['combobox']['values'] = ["" + angajat[0] + " - " + angajat[1] for angajat in self.angajat['mapa']]
         self.angajat['combobox'].current(0)
 
 
     def Farmacist_Selected(self,event):
         text = self.angajat['combobox'].get()
-        self.angajat['selectie_id'] = text[(text.rfind('-') + 2):]
-        indexes = [index for index, value in enumerate(text) if value == '-']
-        self.angajat['selectie_job'] = text[int(indexes[1] + 2):int(indexes[2]-1)]
+        for label in self.angajat['mapa']:
+            if label[0] == text[:text.find(" -")]:
+                self.angajat['selectie_id'] = label[2]
+                self.angajat['selectie_job'] = label[1]
+                break
 
         self.medicament['mapa'] = DataBaseOperations.ExtractDrugsForSpecificEmployee(database.cursor_,self.angajat['selectie_job'])
-        self.medicament['combobox']['values'] = [str(medicament[0]) + " -- " + medicament[1] for medicament in self.medicament['mapa']]
+        self.medicament['combobox']['values'] = [medicament[1] for medicament in self.medicament['mapa']]
         self.medicament['combobox'].current(0)
 
 
     def Medicament_Selected(self,event):
         text = self.medicament['combobox'].get()
-        self.medicament['selectie'] = text[:text.find('-') - 1]
-
+        for label in self.medicament['mapa']:
+            if label[1] == text:
+                self.medicament['selectie'] = label[0]
+                break
+        print(self.medicament['selectie'])
         self.stoc = DataBaseOperations.ExtractDrugsInventory(database.cursor_,self.farmacie['selectie_id'],self.medicament['selectie'])
         self.stoc = [self.stoc[0][0],self.stoc[0][1]]
         self.stoc_var.set(str(self.stoc[0]))
@@ -333,8 +382,10 @@ class Transaction(tk.Frame):
     def UpdateTabelaVanzari(self,cantitate):
         result = DataBaseOperations.InsertCommand(database.connection,"INSERT INTO VANZARI VALUES({},{},{})".format(self.angajat['selectie_id'],
                                                                                                self.medicament['selectie'],
-                                                                                               cantitate))
+                                                                                              cantitate))
+        print("***")
         print(result[1])
+        print("***")
         if result[0] == False:
             DataBaseOperations.AlterSales(database.connection,
                                             cantitate,
@@ -385,7 +436,7 @@ class ActualizareStoc(tk.Frame):
     def CreateComboboxes(self):
         tk.Label(self,text="Selectati farmacia",font=("Verdana",14),background="bisque").pack(pady=20,padx=0)
         self.farmacie['mapa'] = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,"FARMACII",["ID_FARMACIE"],0)
-        self.farmacie['mapa'] = [["FARMACIA--",element] for element in self.farmacie['mapa']]
+        self.farmacie['mapa'] = ["FARMACIA " + str(element) for element in range(1,4)]
         self.farmacie['combobox'] = ttk.Combobox(self,values=self.farmacie['mapa'],state='readonly')
         self.farmacie['combobox'].bind('<<ComboboxSelected>>',self.Farma_Selected)
         self.farmacie['combobox'].pack(pady=5,padx=0)
@@ -421,7 +472,8 @@ class ActualizareStoc(tk.Frame):
         tk.Button(self,text="Cumpara",font=("Verdana",13),command = lambda: self.Achizitie()).pack(pady=5,padx=0)
 
     def Farma_Selected(self,event):
-        self.farmacie['selectie_id'] = self.farmacie['combobox'].get()[len("FARMACIA-- "):]
+        text = self.farmacie['combobox'].get()
+        self.farmacie['selectie_id'] = str(2000 + int(text[text.find(" ")+1:]) - 1)
         self.distribuitor['selectie_id'] = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,
                                                                                           "FARMACII",["ID_DISTRIBUITOR"],
                                                                                           "ID_FARMACIE = {}".format(self.farmacie['selectie_id']))[0][0]
@@ -430,21 +482,24 @@ class ActualizareStoc(tk.Frame):
                                                                            "DISTRIBUITORI",["NUME"],
                                                                            "ID_DISTRIBUITOR = {}".format(self.distribuitor['selectie_id']))[0][0]
 
-        self.distribuitor['text'].set(nume_distribuitor + ' -- ' + str(self.distribuitor['selectie_id']))
+        self.distribuitor['text'].set(nume_distribuitor)
 
         self.medicament['mapa'] = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,
                                                                                  "DEPOZITE",["ID_MEDICAMENT","STOC","PRET"],
                                                                                  "ID_DISTRIBUITOR = {}".format(self.distribuitor['selectie_id']))
 
 
-        nume_medicamente = DataBaseOperations.GetDrugNameFromDeposits(database.cursor_,self.distribuitor['selectie_id'])
-        self.medicament['combobox']['values'] = [str(medicament[0]) + " -- " + medicament[1] for medicament in nume_medicamente]
+        self.nume_medicamente = DataBaseOperations.GetDrugNameFromDeposits(database.cursor_,self.distribuitor['selectie_id'])
+        self.medicament['combobox']['values'] = [medicament[1] for medicament in self.nume_medicamente]
         self.medicament['combobox'].current(0)
 
 
     def Medicament_Selected(self,event):
         combo_result = self.medicament['combobox'].get()
-        self.medicament['selectie_id'] = combo_result[:combo_result.find('-')-1]
+        for field in self.nume_medicamente:
+            if field[1] == combo_result:
+                self.medicament['selectie_id'] = str(field[0])
+                break
 
         for element in self.medicament['mapa']:
             if int(element[0]) == int(self.medicament['selectie_id']):
@@ -501,10 +556,9 @@ class Contabilitate(tk.Frame):
         self.valoare_brut = [0,0,0]
         self.profit = [0,0,0]
 
-        #self.GetValues()
 
 
-    def Show(self):
+    def Show(self,cont):
         if self.listBox != None:
             self.listBox.destroy()
         self.GetValues()
@@ -522,7 +576,7 @@ class Contabilitate(tk.Frame):
         self.closeButton.pack(pady=10,padx=40)
 
     def GetValues(self):
-        self.cols = ['INDEX','FARMACIA','MEDICAMENTE VANDUTE','VALOARE VANZARE','VALOARE CUMPARARE','PROFIT','costs']
+        self.cols = ['INDEX','FARMACIA','MEDICAMENTE VANDUTE','VALOARE VANZARE','VALOARE CUMPARARE','PROFIT','CHELTUIELI']
         self.tempList = []
         self.nr_med_vandute = {}
         self.status_vanzari = {}
@@ -530,11 +584,6 @@ class Contabilitate(tk.Frame):
         self.valoare_vanzari = [0,0,0]
         self.valoare_brut = [0,0,0]
         self.profit = [0,0,0]
-        #adaugam si angajatul lunii
-        #agaugam si managerul lunii
-        #creste salariul
-        #afisarem cel mai vandut medicament
-        #aplicam reducere pret medicament
 
         self.farmacii = DataBaseOperations.ExtractColumnsWithCondition(database.cursor_,"FARMACII",
                                                                   ['ID_FARMACIE'],0)
@@ -552,8 +601,6 @@ class Contabilitate(tk.Frame):
             situatie_vanzare = DataBaseOperations.ExtractGrossPrice(database.cursor_,farmacie[0])
             self.status_brut[farmacie[0]] = situatie_vanzare
 
-        print(self.status_vanzari)
-        print(self.status_brut)
 
         for idx,farmacie in enumerate(self.farmacii):
             for element in self.status_vanzari[farmacie[0]]:
@@ -565,8 +612,6 @@ class Contabilitate(tk.Frame):
 
             self.profit[idx] = self.valoare_vanzari[idx] - self.valoare_brut[idx]
 
-        print(self.profit)
-        print(costs)
 
         for idx,farmacie in enumerate(self.farmacii):
             temp = [farmacie[0],
